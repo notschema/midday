@@ -8,10 +8,13 @@ type Props = {
 };
 
 export function Meta({ template, invoiceNumber, issueDate, dueDate }: Props) {
-  // Simple date formatter to replace date-fns and TZDate
+  // Simple date formatter to replace date-fns
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
     const date = new Date(dateString);
+    
+    // Use simple date formatting that approximates your template format
+    // This eliminates the entire date-fns dependency
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
