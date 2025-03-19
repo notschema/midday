@@ -37,34 +37,11 @@
         "SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING",
         "SLACK_CLIENT_SECRET",
         "SLACK_CLIENT_ID",
-        "SLACK_SIGNING_SECRET"
+        "SLACK_SIGNING_SECRET",
+        "WEBHOOK_SECRET_KEY",
+        "INVOICE_JWT_SECRET",
+        "SLACK_APP_TOKEN"
       ],
       "inputs": ["$TURBO_DEFAULT$", ".env"],
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "next-env.d.ts", ".expo/**"]
-    },
-    "start": {
-      "cache": false
-    },
-    "test": {
-      "cache": false
-    },
-    "dev": {
-      "inputs": ["$TURBO_DEFAULT$", ".env"],
-      "persistent": true,
-      "cache": false
-    },
-    "jobs": {
-      "persistent": true,
-      "cache": false
-    },
-    "format": {},
-    "lint": {
-      "dependsOn": ["^topo"]
-    },
-    "typecheck": {
-      "dependsOn": ["^topo"],
-      "outputs": ["node_modules/.cache/tsbuildinfo.json"]
-    }
-  }
-}
+      "outputs": [".next/**", "!.next/cache/
