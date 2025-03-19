@@ -5,6 +5,12 @@ import { syncConnection } from "jobs/tasks/bank/sync/connection";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+// Check if Teller credentials exist
+const hasTellerCredentials = !!(
+  process.env.TELLER_CERTIFICATE && 
+  process.env.TELLER_CERTIFICATE_PRIVATE_KEY
+);
+
 const webhookSchema = z.object({
   id: z.string(),
   payload: z.object({
@@ -21,63 +27,66 @@ const webhookSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // If Teller is not configured, return a successful response
+  if (!hasTellerCredentials) {
+    console.log('Teller is not configured. Webhook endpoint is disabled.');
+    return NextResponse.json({ status: 'Teller not configured' }, { status: 200 });
+  }
+
   const text = await req.clone().text();
   const body = await req.json();
-
+  
   const signatureValid = validateTellerSignature({
     signatureHeader: req.headers.get("teller-signature"),
     text,
   });
-
+  
   if (!signatureValid) {
     return NextResponse.json(
       { error: "Invalid webhook signature" },
       { status: 401 },
     );
   }
-
+  
   // Parse and validate webhook body
   const result = webhookSchema.safeParse(body);
-
   if (!result.success) {
     return NextResponse.json(
       { error: "Invalid webhook payload", details: result.error.issues },
       { status: 400 },
     );
   }
-
+  
   const { type, payload } = result.data;
-
   if (type === "webhook.test") {
     return NextResponse.json({ success: true });
   }
-
+  
   if (!payload.enrollment_id) {
     return NextResponse.json(
       { error: "Missing enrollment_id" },
       { status: 400 },
     );
   }
-
+  
   const supabase = createClient({ admin: true });
-
   const { data: connectionData, error: connectionError } = await supabase
     .from("bank_connections")
     .select("id, created_at")
     .eq("enrollment_id", payload.enrollment_id)
     .single();
-
+    
   console.log("payload", payload);
   console.log("connectionData", connectionData);
   console.log("connectionError", connectionError);
-
+  
   if (!connectionData) {
     return NextResponse.json(
       { error: "Connection not found" },
       { status: 404 },
     );
   }
-
+  
   switch (type) {
     case "transactions.processed":
       {
@@ -86,7 +95,6 @@ export async function POST(req: NextRequest) {
           new Date(connectionData.created_at),
           subDays(new Date(), 1),
         );
-
         await syncConnection.trigger({
           connectionId: connectionData.id,
           manualSync,
@@ -94,6 +102,6 @@ export async function POST(req: NextRequest) {
       }
       break;
   }
-
+  
   return NextResponse.json({ success: true });
 }
