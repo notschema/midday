@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 1,
   "public": false,
   "github": {
     "enabled": false
   },
-  "regions": ["fra1", "sfo1", "iad1"]
+  "regions": ["syd1"]
 }
