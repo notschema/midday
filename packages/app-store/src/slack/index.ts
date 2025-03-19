@@ -1,3 +1,8 @@
-export { default as config } from "./config";
-export { verifySlackRequest } from "@slack/bolt";
-export * from "./lib";
+// src/slack/index.ts
+export { config } from './config';
+export { createSlackClient, createSlackApp, verifySlackRequestWrapper as verifySlackRequest } from './adapter';
+
+// Re-implement handleSlackEvent with ES Module syntax
+export const handleSlackEvent = async (event: any, options: any) => {
+  // Implementation using the wrappers
+};
