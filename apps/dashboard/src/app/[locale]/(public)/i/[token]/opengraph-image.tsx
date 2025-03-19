@@ -10,26 +10,20 @@ export default async function Image({ params }: { params: { token: string } }) {
   const supabase = createClient({ admin: true });
   const { id } = await verify(params.token);
   
-  // Direct, simplified query instead of using getInvoiceQuery
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('id, invoice_number, issue_date, due_date, customer_name, template, customer_details, from_details, status, customer:customers(name, website)')
-    .eq('id', id)
-    .single();
+  // Use your existing query function
+  const { data: invoice } = await getInvoiceQuery(supabase, id);
 
   if (!invoice) {
     return new Response("Not found", { status: 404 });
   }
 
-  // Simplified logo approach - assume valid and let component handle fallback
-  const logoUrl = invoice.customer?.website 
-    ? `https://img.logo.dev/${invoice.customer.website}?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ&size=60` 
-    : null;
+  // Create logo URL as before
+  const logoUrl = `https://img.logo.dev/${invoice.customer?.website}?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ&size=60`;
   
-  // Assume valid, component will handle fallback
-  const isValidLogo = !!logoUrl;
+  // Simple validation - assume valid, component handles fallback
+  const isValidLogo = !!invoice.customer?.website;
 
-  // Use ImageResponse without custom fonts
+  // IMPORTANT: Remove font loading and use system fonts
   return new ImageResponse(
     <OgTemplate
       {...invoice}
@@ -40,7 +34,7 @@ export default async function Image({ params }: { params: { token: string } }) {
     {
       width: 1200,
       height: 630,
-      // No custom fonts - will use system fonts
+      // No custom fonts defined here
     }
   );
 }
