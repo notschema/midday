@@ -13,7 +13,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // 5min
+export const maxDuration = 60; // 1 Min - change to 300 sec if on pro plan.
 
 // https://postmarkapp.com/support/article/800-ips-for-firewalls#webhooks
 const ipRange = [
