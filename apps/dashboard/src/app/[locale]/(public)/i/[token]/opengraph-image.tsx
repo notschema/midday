@@ -1,36 +1,35 @@
-import { OgTemplate, isValidLogoUrl } from "@midday/invoice";
+import { OgTemplate } from "@midday/invoice";
 import { verify } from "@midday/invoice/token";
-import { getInvoiceQuery } from "@midday/supabase/queries";
 import { createClient } from "@midday/supabase/server";
 import { ImageResponse } from "next/og";
 
 export const contentType = "image/png";
 export const runtime = "edge";
 
-const CDN_URL = "https://cdn.midday.ai";
-
 export default async function Image({ params }: { params: { token: string } }) {
   const supabase = createClient({ admin: true });
-
   const { id } = await verify(params.token);
-  const { data: invoice } = await getInvoiceQuery(supabase, id);
+  
+  // Direct, simplified query instead of using getInvoiceQuery
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, invoice_number, issue_date, due_date, customer_name, template, customer_details, from_details, status, customer:customers(name, website)')
+    .eq('id', id)
+    .single();
 
   if (!invoice) {
     return new Response("Not found", { status: 404 });
   }
 
-  const geistMonoRegular = fetch(
-    `${CDN_URL}/fonts/GeistMono/og/GeistMono-Regular.otf`,
-  ).then((res) => res.arrayBuffer());
+  // Simplified logo approach - assume valid and let component handle fallback
+  const logoUrl = invoice.customer?.website 
+    ? `https://img.logo.dev/${invoice.customer.website}?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ&size=60` 
+    : null;
+  
+  // Assume valid, component will handle fallback
+  const isValidLogo = !!logoUrl;
 
-  const geistSansRegular = fetch(
-    `${CDN_URL}/fonts/Geist/og/Geist-Regular.otf`,
-  ).then((res) => res.arrayBuffer());
-
-  const logoUrl = `https://img.logo.dev/${invoice.customer?.website}?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ&size=60`;
-
-  const isValidLogo = await isValidLogoUrl(logoUrl);
-
+  // Use ImageResponse without custom fonts
   return new ImageResponse(
     <OgTemplate
       {...invoice}
@@ -41,20 +40,7 @@ export default async function Image({ params }: { params: { token: string } }) {
     {
       width: 1200,
       height: 630,
-      fonts: [
-        {
-          name: "GeistMono",
-          data: await geistMonoRegular,
-          style: "normal",
-          weight: 400,
-        },
-        {
-          name: "GeistSans",
-          data: await geistSansRegular,
-          style: "normal",
-          weight: 400,
-        },
-      ],
-    },
+      // No custom fonts - will use system fonts
+    }
   );
 }
