@@ -242,9 +242,11 @@ export async function getTransactionsQuery(
       query.order(column, { ascending });
     }
   } else {
+    // NOTE: date can be on the same day (2020-01-01), so we need to order by id and amount to keep the order
     query
       .order("date", { ascending: false })
-      .order("created_at", { ascending: false });
+      .order("name", { ascending: false })
+      .order("id", { ascending: false });
   }
 
   if (start && end) {
@@ -259,7 +261,7 @@ export async function getTransactionsQuery(
     if (!Number.isNaN(Number.parseInt(searchQuery))) {
       query.eq("amount", Number(searchQuery));
     } else {
-      query.textSearch("fts_vector", `%${searchQuery}%:*`);
+      query.textSearch("fts_vector", `${searchQuery.replaceAll(" ", "+")}:*`);
     }
   }
 
@@ -406,7 +408,8 @@ export async function getSimilarTransactions(
     .from("transactions")
     .select("id, amount, team_id", { count: "exact" })
     .eq("team_id", teamId)
-    .textSearch("fts_vector", `%${name}%:*`)
+    .textSearch("fts_vector", `${name.replaceAll(" ", "+")}:*`)
+    .neq("category_slug", categorySlug)
     .throwOnError();
 }
 
@@ -660,7 +663,7 @@ export async function getVaultQuery(supabase: Client, params: GetVaultParams) {
   }
 
   if (searchQuery) {
-    query.textSearch("fts", `'${searchQuery}'`);
+    query.textSearch("fts", `${searchQuery.replaceAll(" ", "+")}:*`);
   }
 
   const { data } = await query;
@@ -708,8 +711,7 @@ export async function getVaultActivityQuery(supabase: Client, teamId: string) {
 
 type GetVaultRecursiveParams = {
   teamId: string;
-  path?: string;
-  folder?: string;
+  folder: string;
   limit?: number;
   offset?: number;
 };
@@ -718,50 +720,44 @@ export async function getVaultRecursiveQuery(
   supabase: Client,
   params: GetVaultRecursiveParams,
 ) {
-  const { teamId, path, folder, limit = 10000 } = params;
+  const { teamId, folder, limit = 10000 } = params;
 
-  let basePath = teamId;
+  async function fetchFolderContents(parentId: string) {
+    const query = supabase
+      .from("documents")
+      .select(
+        "id, name, path_tokens, created_at, team_id, metadata, tag, owner:owner_id(*)",
+      )
+      .eq("team_id", teamId)
+      .eq("parent_id", parentId)
+      .limit(limit)
+      .order("created_at", { ascending: true });
 
-  if (path) {
-    basePath = `${basePath}/${path}`;
-  }
+    const { data } = await query;
+    if (!data) return [];
 
-  if (folder) {
-    basePath = `${basePath}/${folder}`;
-  }
+    const results = [];
+    for (const item of data) {
+      // Cast the item to Document type
+      const documentItem = item;
+      results.push(documentItem);
 
-  const items = [];
-  let folderContents: any = [];
-
-  for (;;) {
-    const { data } = await supabase.storage.from("vault").list(basePath);
-
-    folderContents = folderContents.concat(data);
-    // offset += limit;
-    if ((data || []).length < limit) {
-      break;
+      // If this is a folder (ends with .folderPlaceholder), recursively get its contents
+      if (documentItem.path_tokens?.at(-1) === ".folderPlaceholder") {
+        // Use the path token before .folderPlaceholder as the parent ID
+        const folderParentId = documentItem.path_tokens.at(-2);
+        if (folderParentId) {
+          const folderContents = await fetchFolderContents(folderParentId);
+          results.push(...folderContents);
+        }
+      }
     }
+
+    return results;
   }
 
-  const subfolders = folderContents?.filter((item) => item.id === null) ?? [];
-  const folderItems = folderContents?.filter((item) => item.id !== null) ?? [];
-
-  folderItems.forEach((item) => items.push({ ...item, basePath }));
-
-  const subFolderContents = await Promise.all(
-    subfolders.map((folder: any) =>
-      getVaultRecursiveQuery(supabase, {
-        ...params,
-        folder: decodeURIComponent(folder.name),
-      }),
-    ),
-  );
-
-  subFolderContents.map((subfolderContent) => {
-    subfolderContent.map((item) => items.push(item));
-  });
-
-  return items;
+  const data = await fetchFolderContents(folder);
+  return data;
 }
 
 export async function getTeamsByUserIdQuery(supabase: Client, userId: string) {
@@ -871,7 +867,7 @@ export async function getInboxQuery(
     if (!Number.isNaN(Number.parseInt(searchQuery))) {
       query.like("inbox_amount_text", `%${searchQuery}%`);
     } else {
-      query.textSearch("fts", `${searchQuery}:*`);
+      query.textSearch("fts", `${searchQuery.replaceAll(" ", "+")}:*`);
     }
   }
 
@@ -1153,7 +1149,7 @@ export async function getInboxSearchQuery(
   if (!Number.isNaN(Number.parseInt(q))) {
     query.like("inbox_amount_text", `%${q}%`);
   } else {
-    query.textSearch("fts", `${q}:*`);
+    query.textSearch("fts", `${q.replaceAll(" ", "+")}:*`);
   }
 
   const { data } = await query.range(0, limit);
@@ -1230,7 +1226,7 @@ export async function getInvoicesQuery(
     if (!Number.isNaN(Number.parseInt(searchQuery))) {
       query.eq("amount", Number(searchQuery));
     } else {
-      query.textSearch("fts", `%${searchQuery}%:*`);
+      query.textSearch("fts", `${searchQuery.replaceAll(" ", "+")}:*`);
     }
   }
 
